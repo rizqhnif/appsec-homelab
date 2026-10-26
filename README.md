@@ -1,17 +1,17 @@
 # Application Security & Defensive Engineering Homelab
 
-Repositori ini mendokumentasikan analisis kerentanan web OWASP, inspeksi semantik Web Application Firewall (SafeLine WAF), dan implementasi secure coding.
+This repository documents hands-on security research covering OWASP Web vulnerabilities, Web Application Firewall (SafeLine WAF) semantic inspection, and enterprise secure coding implementations.
 
 ## Lab Modules & Progress
 
-| Modul | Fokus Materi | Level | Status | Laporan |
-| :--- | :--- | :--- | :--- | :--- |
-| Day 1 | SQLi Internals, Lexer/Parser, UNION & WAF Analysis | Low | Selesai | [Baca Laporan](docs/day-01-sqli-internals.md) |
-| Day 2 | Inferential Blind SQLi (Boolean & Time-Based) | Low | Terjadwal | - |
-| Day 3 | Second-Order SQLi, Automated Tools & Hardening | Medium | Terjadwal | - |
+| Module | Core Subject | Security Level | Status | Writeup |
+| :--- | :--- | :---: | :---: | :--- |
+| **Day 1** | **SQLi Internals, Lexer/Parser, UNION & WAF Analysis** | Low | Complete | [Read Report](docs/day-01-sqli-internals.md) |
+| **Day 2** | Inferential Blind SQLi (Boolean & Time-Based) | Low | Scheduled | Coming Soon |
+| **Day 3** | Second-Order SQLi, Automated Tools & Hardening | Medium | Scheduled | Coming Soon |
 
-## Metodologi Riset: Hands-On & AI-Augmented
+## Research Methodology: Hands-On & AI-Augmented
 
-Repositori ini dikembangkan dengan prinsip **integritas teknis & efisiensi modern**:
-* **100% Hands-On Verification**: Setiap kerentanan dieksploitasi, dianalisis, dan diverifikasi secara langsung pada infrastruktur homelab lokal (DVWA, MariaDB, SafeLine WAF).
-* **AI as Research & Learning Partner**: AI dimanfaatkan sebagai asisten belajar saya dalam memahami konsep dan asisten standarisasi dokumentasi teknis.
+This repository is built upon **technical integrity & modern efficiency**:
+* **100% Hands-On Verification**: Every vulnerability is discovered, exploited, and verified directly within a local homelab infrastructure (DVWA, MariaDB, Chaitin SafeLine WAF).
+* **AI as Research & Learning Partner**: AI is leveraged as an interactive learning partner and to standardize documentation to enterprise security reporting levels.
