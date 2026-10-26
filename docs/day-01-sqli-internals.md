@@ -228,9 +228,6 @@ Kombinasi token ini dikenali oleh mesin leksikal WAF sebagai struktur gramatikal
 ![SafeLine Action Blocked Event](./assets/day1/action-blocked.png)
 *Gambar 4.2: Dashboard SafeLine mencatat event penyerangan dan aksi pencegahan (Blocked).*
 
-![SafeLine Detected SQLi Alert Detail](./assets/day1/detected-SQLi.png)
-*Gambar 4.3: Detail telemetri event penyerangan yang diklasifikasikan sebagai kategori "SQL Injection".*
-
 ---
 
 ### 2. Forensic Audit Log Verification (Audit Mode)
