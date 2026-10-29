@@ -8,7 +8,7 @@ This repository documents hands-on security research covering OWASP Web vulnerab
 | :--- | :--- | :---: | :---: | :--- |
 | **Day 1** | **SQLi Internals, Lexer/Parser, UNION & WAF Analysis** | Low | Complete | [Read Report](docs/day-01-sqli-internals.md) |
 | **Day 2** | **Inferential Blind SQLi (Boolean & Time-Based)** | Low | Complete | [Read Report](docs/day-02-blind-sqli-latency.md) |
-| **Day 3** | Second-Order SQLi, Automated Tools & Hardening | Medium | Scheduled | Coming Soon |
+| **Day 3** | **Second-Order SQLi, Scanner vs WAF & Engine Hardening** | Medium | Complete | [Read Report](docs/day-03-second-order-hardening.md) |
 
 ## Research Methodology: Hands-On & AI-Augmented
 
