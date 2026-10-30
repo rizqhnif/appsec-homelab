@@ -121,13 +121,13 @@ The objective is to verify whether the data literal boundary can be broken and w
 #### Visual Evidence — Phase A:
 
 <p align="center">
-  <img src="./assets/day1/quote-input-error.png" alt="Single Quote Input Test" />
+  <img src="../assets/sqli/day1/quote-input-error.png" alt="Single Quote Input Test" />
   <br>
   <em><strong>Figure 3.1:</strong> Submitting a single quote (<code>'</code>) into the User ID input parameter.</em>
 </p>
 
 <p align="center">
-  <img src="./assets/day1/error-alert-1.png" alt="MariaDB Syntax Error Leakage" />
+  <img src="../assets/sqli/day1/error-alert-1.png" alt="MariaDB Syntax Error Leakage" />
   <br>
   <em><strong>Figure 3.2:</strong> Verbose MariaDB syntax error leaked directly into the application interface.</em>
 </p>
@@ -163,19 +163,19 @@ SELECT first_name, last_name FROM users WHERE user_id = '1' ORDER BY 3 #';
 #### Visual Evidence — Phase B:
 
 <p align="center">
-  <img src="./assets/day1/orderby-1.png" alt="ORDER BY 1 Valid" />
+  <img src="../assets/sqli/day1/orderby-1.png" alt="ORDER BY 1 Valid" />
   <br>
   <em><strong>Figure 3.3:</strong> Execution of <code>1' ORDER BY 1 #</code> returns valid user data.</em>
 </p>
 
 <p align="center">
-  <img src="./assets/day1/orderby2.png" alt="ORDER BY 2 Valid" />
+  <img src="../assets/sqli/day1/orderby2.png" alt="ORDER BY 2 Valid" />
   <br>
   <em><strong>Figure 3.4:</strong> Execution of <code>1' ORDER BY 2 #</code> returns valid user data.</em>
 </p>
 
 <p align="center">
-  <img src="./assets/day1/orderby3-error.png" alt="ORDER BY 3 Column Error" />
+  <img src="../assets/sqli/day1/orderby3-error.png" alt="ORDER BY 3 Column Error" />
   <br>
   <em><strong>Figure 3.5:</strong> Execution of <code>1' ORDER BY 3 #</code> triggers <code>Unknown column '3'</code>, confirming exactly 2 projection columns.</em>
 </p>
@@ -191,7 +191,7 @@ Having established a projection width of 2 columns, reflection testing was condu
 * **Result**: Column 1 reflects into the `First name` field, and Column 2 reflects into the `Surname` field.
 
 <p align="center">
-  <img src="./assets/day1/union-select-1-2.png" alt="UNION Reflection Test" />
+  <img src="../assets/sqli/day1/union-select-1-2.png" alt="UNION Reflection Test" />
   <br>
   <em><strong>Figure 3.6:</strong> Reflection test <code>1' UNION SELECT 1, 2 #</code> successfully displays literal integers in output fields.</em>
 </p>
@@ -210,7 +210,7 @@ Having established a projection width of 2 columns, reflection testing was condu
 #### Visual Evidence — Phase C:
 
 <p align="center">
-  <img src="./assets/day1/skemaname.png" alt="Exfiltrated Database Schemas" />
+  <img src="../assets/sqli/day1/skemaname.png" alt="Exfiltrated Database Schemas" />
   <br>
   <em><strong>Figure 3.7:</strong> Schema exfiltration dumping the complete MariaDB database catalog to the browser.</em>
 </p>
@@ -252,13 +252,13 @@ The semantic engine identifies this sequence as a prohibited grammatical SQL exp
 #### Visual Evidence — Balance Mode:
 
 <p align="center">
-  <img src="./assets/day1/forbidden.png" alt="SafeLine 403 Forbidden Interception" />
+  <img src="../assets/sqli/day1/forbidden.png" alt="SafeLine 403 Forbidden Interception" />
   <br>
   <em><strong>Figure 4.1:</strong> SafeLine WAF 403 Forbidden page intercepting the SQL injection attempt.</em>
 </p>
 
 <p align="center">
-  <img src="./assets/day1/action-blocked.png" alt="SafeLine Action Blocked Event" />
+  <img src="../assets/sqli/day1/action-blocked.png" alt="SafeLine Action Blocked Event" />
   <br>
   <em><strong>Figure 4.2:</strong> SafeLine WAF security dashboard logging the attack event and verifying the "Blocked" mitigation action.</em>
 </p>
@@ -280,7 +280,7 @@ To assess detection accuracy and telemetry transparency without terminating the 
 #### Visual Evidence — Audit Mode:
 
 <p align="center">
-  <img src="./assets/day1/auditted.png" alt="SafeLine Forensic Audit Log" />
+  <img src="../assets/sqli/day1/auditted.png" alt="SafeLine Forensic Audit Log" />
   <br>
   <em><strong>Figure 4.3:</strong> SafeLine WAF forensic audit log recording 100% of attack payloads with "Audited" disposition status.</em>
 </p>

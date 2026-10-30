@@ -184,13 +184,13 @@ logical operators in ID field (Brute-force / Enumeration threshold)
 * **Evaluation**: If the database name is exactly 4 characters long, the query evaluates to `TRUE`, returning `User ID exists in the database.`.
 
 <p align="center">
-  <img src="./assets/day2/boolean-length-input.png" alt="Payload Input: Database Length Verification" />
+  <img src="../assets/sqli/day2/boolean-length-input.png" alt="Payload Input: Database Length Verification" />
   <br>
   <em><strong>Figure 4.1:</strong> Submitting payload <code>1' AND LENGTH(database()) = 4 #</code> to probe database name length.</em>
 </p>
 
 <p align="center">
-  <img src="./assets/day2/boolean-length-response.png" alt="Response: User ID exists" />
+  <img src="../assets/sqli/day2/boolean-length-response.png" alt="Response: User ID exists" />
   <br>
   <em><strong>Figure 4.2:</strong> Boolean oracle confirms TRUE (<code>User ID exists in the database.</code>), proving database name length is exactly 4 characters.</em>
 </p>
@@ -203,13 +203,13 @@ logical operators in ID field (Brute-force / Enumeration threshold)
   * **Evaluation**: ASCII value `100` corresponds to character `'d'`. The response confirms `User ID exists`, proving the first letter is `d`.
 
 <p align="center">
-  <img src="./assets/day2/boolean-char1-input.png" alt="Payload Input: First Character Extraction" />
+  <img src="../assets/sqli/day2/boolean-char1-input.png" alt="Payload Input: First Character Extraction" />
   <br>
   <em><strong>Figure 4.3:</strong> Submitting <code>1' AND ASCII(SUBSTRING(database(), 1, 1)) = 100 #</code> to test the first character.</em>
 </p>
 
 <p align="center">
-  <img src="./assets/day2/boolean-char1-response.png" alt="Response: First Character Confirmed" />
+  <img src="../assets/sqli/day2/boolean-char1-response.png" alt="Response: First Character Confirmed" />
   <br>
   <em><strong>Figure 4.4:</strong> Application returns TRUE (<code>User ID exists</code>), confirming the first character of the database name is 'd'.</em>
 </p>
@@ -219,7 +219,7 @@ logical operators in ID field (Brute-force / Enumeration threshold)
   * **Evaluation**: ASCII value `118` corresponds to character `'v'`.
 
 <p align="center">
-  <img src="./assets/day2/boolean-char2-input.png" alt="Payload Input: Second Character Extraction" />
+  <img src="../assets/sqli/day2/boolean-char2-input.png" alt="Payload Input: Second Character Extraction" />
   <br>
   <em><strong>Figure 4.5:</strong> Submitting <code>1' AND ASCII(SUBSTRING(database(), 2, 1)) = 118 #</code>, successfully verifying the second character as 'v'.</em>
 </p>
@@ -236,13 +236,13 @@ Using Browser Developer Tools (Network Waterfall tab), server latency was measur
 * **Observed Latency**: Response returned instantaneously ($< 100\text{ ms}$).
 
 <p align="center">
-  <img src="./assets/day2/time-verification-input.png" alt="Payload Input: Time Delay Verification" />
+  <img src="../assets/sqli/day2/time-verification-input.png" alt="Payload Input: Time Delay Verification" />
   <br>
   <em><strong>Figure 4.6:</strong> Submitting time-delay test payload <code>1' AND IF(1=1, SLEEP(5), 0) #</code>.</em>
 </p>
 
 <p align="center">
-  <img src="./assets/day2/time-verification-response.png" alt="Network Waterfall Latency Verification" />
+  <img src="../assets/sqli/day2/time-verification-response.png" alt="Network Waterfall Latency Verification" />
   <br>
   <em><strong>Figure 4.7:</strong> Network tab confirms HTTP response latency exceeding 5,000 ms, verifying execution of <code>SLEEP(5)</code>.</em>
 </p>
@@ -255,13 +255,13 @@ Extracting database metadata strictly through response latency intervals:
 * **Outcome**: Browser waits exactly 3.00 seconds before completing the request, confirming character `'d'` without any visual differential feedback.
 
 <p align="center">
-  <img src="./assets/day2/time-inference-input.png" alt="Payload Input: Time-Based Data Inference" />
+  <img src="../assets/sqli/day2/time-inference-input.png" alt="Payload Input: Time-Based Data Inference" />
   <br>
   <em><strong>Figure 4.8:</strong> Submitting time-based inference payload for database character extraction.</em>
 </p>
 
 <p align="center">
-  <img src="./assets/day2/time-inference-response.png" alt="Response: 3-Second Latency Confirmation" />
+  <img src="../assets/sqli/day2/time-inference-response.png" alt="Response: 3-Second Latency Confirmation" />
   <br>
   <em><strong>Figure 4.9:</strong> Network latency precisely measures a 3-second delay, confirming the inductive hypothesis via timing side-channel.</em>
 </p>
@@ -279,7 +279,7 @@ When switched to **Balance Mode**, SafeLine intercepts the `SLEEP(5)` payload in
 * **Impact**: MariaDB never receives the query, preventing database worker threads from sleeping and eliminating resource exhaustion risks.
 
 <p align="center">
-  <img src="./assets/day2/waf-instant-block-sleep.png" alt="SafeLine WAF Instant Interception" />
+  <img src="../assets/sqli/day2/waf-instant-block-sleep.png" alt="SafeLine WAF Instant Interception" />
   <br>
   <em><strong>Figure 4.10:</strong> SafeLine WAF intercepts the time-based payload in &lt;10 ms with HTTP 403 Forbidden, protecting MariaDB threads from sleep suspension.</em>
 </p>

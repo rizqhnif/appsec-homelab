@@ -4,11 +4,19 @@ This repository documents hands-on security research covering OWASP Web vulnerab
 
 ## Lab Modules & Progress
 
-| Module | Core Subject | Security Level | Status | Writeup |
+### 🛡️ Module 1: Structured Query Language Injection (SQLi)
+
+| Day | Core Subject | Security Level | Status | Writeup |
 | :--- | :--- | :---: | :---: | :--- |
-| **Day 1** | **SQLi Internals, Lexer/Parser, UNION & WAF Analysis** | Low | Complete | [Read Report](docs/day-01-sqli-internals.md) |
-| **Day 2** | **Inferential Blind SQLi (Boolean & Time-Based)** | Low | Complete | [Read Report](docs/day-02-blind-sqli-latency.md) |
-| **Day 3** | **Second-Order SQLi, Scanner vs WAF & Engine Hardening** | Medium | Complete | [Read Report](docs/day-03-second-order-hardening.md) |
+| **Day 1** | **SQLi Internals, Lexer/Parser, UNION & WAF Analysis** | Low | Complete | [Read Report](docs/sqli/day-01-sqli-internals.md) |
+| **Day 2** | **Inferential Blind SQLi (Boolean & Time-Based)** | Low | Complete | [Read Report](docs/sqli/day-02-blind-sqli-latency.md) |
+| **Day 3** | **Second-Order SQLi, Scanner vs WAF & Engine Hardening** | Medium | Complete | [Read Report](docs/sqli/day-03-second-order-hardening.md) |
+
+### ⚡ Module 2: Cross-Site Scripting (XSS)
+
+| Day | Core Subject | Security Level | Status | Writeup |
+| :--- | :--- | :---: | :---: | :--- |
+| **Day 1** | **Reflected XSS, Context Escaping & Filter Evasion** | Low | In Progress | *Pending Writeup* |
 
 ## Research Methodology: Hands-On & AI-Augmented
 

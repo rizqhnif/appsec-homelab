@@ -167,7 +167,7 @@ To study practical exploitation patterns under restrictive user interfaces, the 
 ### Visual Evidence: Setting Security Level to Medium
 
 <p align="center">
-  <img src="./assets/day3/sec-lecel-medium.png" alt="DVWA Security Level Medium" />
+  <img src="../assets/sqli/day3/sec-lecel-medium.png" alt="DVWA Security Level Medium" />
   <br>
   <em><strong>Figure 3.1:</strong> DVWA configuration interface confirming security level set to <strong>medium</strong>.</em>
 </p>
@@ -179,7 +179,7 @@ On Medium level, the developer attempted two layers of defense:
 2. **Backend Input Escaping**: Implemented `mysqli_real_escape_string()` on the incoming parameter.
 
 <p align="center">
-  <img src="./assets/day3/dvwa-lvl-medium.png" alt="DVWA Medium SQL Injection Interface" />
+  <img src="../assets/sqli/day3/dvwa-lvl-medium.png" alt="DVWA Medium SQL Injection Interface" />
   <br>
   <em><strong>Figure 3.2:</strong> DVWA Medium SQL Injection interface replacing text input with a predefined drop-down selector.</em>
 </p>
@@ -209,7 +209,7 @@ if( isset( $_POST[ 'Submit' ] ) ) {
 Relying on client-side dropdown restrictions violates the fundamental principle that the client cannot be trusted. By opening Browser Developer Tools (Inspect Element), the attacker alters the HTML DOM of `<select name="id">` before submission:
 
 <p align="center">
-  <img src="./assets/day3/attack-with-inspect.png" alt="DOM Element Inspection and Payload Modification" />
+  <img src="../assets/sqli/day3/attack-with-inspect.png" alt="DOM Element Inspection and Payload Modification" />
   <br>
   <em><strong>Figure 3.3:</strong> Browser DevTools Inspect Element used to tamper with <code>&lt;option value="1"&gt;</code>, modifying it to <code>&lt;option value="1 OR 1=1"&gt;</code>.</em>
 </p>
@@ -222,7 +222,7 @@ When the tampered form is submitted through SafeLine WAF in **Balance Mode**, Sa
 3. SafeLine drops the request immediately, returning an **HTTP 403 Forbidden** custom blocking page (`650ad31c1b394a45ab447be591979357`).
 
 <p align="center">
-  <img src="./assets/day3/theresult-inspect.png" alt="SafeLine WAF Access Forbidden" />
+  <img src="../assets/sqli/day3/theresult-inspect.png" alt="SafeLine WAF Access Forbidden" />
   <br>
   <em><strong>Figure 3.4:</strong> SafeLine WAF blocks the tampered DOM payload, returning an <strong>Access Forbidden (HTTP 403)</strong> event.</em>
 </p>
@@ -232,7 +232,7 @@ When the tampered form is submitted through SafeLine WAF in **Balance Mode**, Sa
 Reviewing the SafeLine WAF Management Dashboard (`https://192.168.1.5:9443` / `100.87.215.88`) under **Events -> LOGS**:
 
 <p align="center">
-  <img src="./assets/day3/waf-logs-result-inspect.png" alt="SafeLine WAF Attack Logs" />
+  <img src="../assets/sqli/day3/waf-logs-result-inspect.png" alt="SafeLine WAF Attack Logs" />
   <br>
   <em><strong>Figure 3.5:</strong> SafeLine WAF log stream capturing the blocked SQL Injection attempt from IP <code>100.116.165.7</code> targeting <code>/vulnerabilities/sqli_blind/</code>.</em>
 </p>
@@ -250,7 +250,7 @@ Reviewing the SafeLine WAF Management Dashboard (`https://192.168.1.5:9443` / `1
 Automated scanners like `sqlmap` represent a significant escalation in offensive volume and velocity compared to manual testing.
 
 <p align="center">
-  <img src="./assets/day3/sqlmap-display.png" alt="sqlmap Wizard Execution" />
+  <img src="../assets/sqli/day3/sqlmap-display.png" alt="sqlmap Wizard Execution" />
   <br>
   <em><strong>Figure 4.1:</strong> Initializing <code>sqlmap --wizard</code> (version 1.10.3#stable) against target endpoints.</em>
 </p>
@@ -363,7 +363,7 @@ docker exec -it $(docker ps -qf "ancestor=vulnerables/web-dvwa") mysql -u app -p
 ```
 
 <p align="center">
-  <img src="./assets/day3/login-to-MariaDB [dvwa].png" alt="Connecting to MariaDB CLI" />
+  <img src="../assets/sqli/day3/login-to-MariaDB [dvwa].png" alt="Connecting to MariaDB CLI" />
   <br>
   <em><strong>Figure 5.1:</strong> Connecting to the MariaDB 10.1.26 shell inside the containerized DVWA environment.</em>
 </p>
@@ -380,7 +380,7 @@ SHOW GRANTS FOR 'root'@'localhost';
 ```
 
 <p align="center">
-  <img src="./assets/day3/showing-access-root-app.png" alt="Show Grants for app and root" />
+  <img src="../assets/sqli/day3/showing-access-root-app.png" alt="Show Grants for app and root" />
   <br>
   <em><strong>Figure 5.2:</strong> Database grants output: <code>app@localhost</code> has privileges scoped exclusively to <code>dvwa.*</code>, whereas <code>root@localhost</code> possesses global <code>ALL PRIVILEGES ... WITH GRANT OPTION</code>.</em>
 </p>
@@ -396,7 +396,7 @@ SELECT User, Host, File_priv, Super_priv, Process_priv, Grant_priv FROM mysql.us
 ```
 
 <p align="center">
-  <img src="./assets/day3/access.png" alt="Global Privileges Audit in mysql.user" />
+  <img src="../assets/sqli/day3/access.png" alt="Global Privileges Audit in mysql.user" />
   <br>
   <em><strong>Figure 5.3:</strong> Querying <code>mysql.user</code>: User <code>app</code> has <code>N</code> across <code>File_priv</code>, <code>Super_priv</code>, <code>Process_priv</code>, and <code>Grant_priv</code>.</em>
 </p>
@@ -414,7 +414,7 @@ SELECT LOAD_FILE('/etc/passwd');
 ```
 
 <p align="center">
-  <img src="./assets/day3/searching-load-file-appuser.png" alt="LOAD_FILE Result NULL" />
+  <img src="../assets/sqli/day3/searching-load-file-appuser.png" alt="LOAD_FILE Result NULL" />
   <br>
   <em><strong>Figure 5.4:</strong> Execution of <code>LOAD_FILE('/etc/passwd')</code> returns <code>NULL</code> because the application service account lacks the global <code>FILE</code> privilege.</em>
 </p>
@@ -430,7 +430,7 @@ SELECT User, Host FROM mysql.user;
 ```
 
 <p align="center">
-  <img src="./assets/day3/dnied-not-root.png" alt="SELECT Denied on mysql.user" />
+  <img src="../assets/sqli/day3/dnied-not-root.png" alt="SELECT Denied on mysql.user" />
   <br>
   <em><strong>Figure 5.5:</strong> Access denied: <code>ERROR 1142 (42000): SELECT command denied to user 'app'@'localhost' for table 'user'</code>.</em>
 </p>
