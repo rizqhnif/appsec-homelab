@@ -37,7 +37,7 @@ flowchart TD
         SYS["System Privileges Revoked<br/>(FILE, PROCESS, SUPER = N)"]
     end
 
-    Attacker["Attacker / sqlmap<br/>(100.116.165.7)"] -->|"Injected / Automated HTTP Requests"| WAF
+    Attacker["Attacker / sqlmap<br/>(100.x.x.x)"] -->|"Injected / Automated HTTP Requests"| WAF
     WAF -->|"Semantic Block / Rate Drop (403 Forbidden)"| Attacker
     WAF -->|"Forward Valid Traffic"| DVWA
     DVWA -->|"SQL Queries via Restricted Account"| DB
@@ -229,18 +229,18 @@ When the tampered form is submitted through SafeLine WAF in **Balance Mode**, Sa
 
 ### Forensic Audit Telemetry
 
-Reviewing the SafeLine WAF Management Dashboard (`https://192.168.1.5:9443` / `100.87.215.88`) under **Events -> LOGS**:
+Reviewing the SafeLine WAF Management Dashboard (`https://192.168.1.5:9443` / `100.x.x.x`) under **Events -> LOGS**:
 
 <p align="center">
   <img src="../assets/sqli/day3/waf-logs-result-inspect.png" alt="SafeLine WAF Attack Logs" />
   <br>
-  <em><strong>Figure 3.5:</strong> SafeLine WAF log stream capturing the blocked SQL Injection attempt from IP <code>100.116.165.7</code> targeting <code>/vulnerabilities/sqli_blind/</code>.</em>
+  <em><strong>Figure 3.5:</strong> SafeLine WAF log stream capturing the blocked SQL Injection attempt from IP <code>100.x.x.x</code> targeting <code>/vulnerabilities/sqli_blind/</code>.</em>
 </p>
 
 * **Action**: `Blocked`
-* **Target URL**: `http://100.87.215.88/vulnerabilities/sqli_blind/`
+* **Target URL**: `http://100.x.x.x/vulnerabilities/sqli_blind/`
 * **Attack Type**: `SQL Inj`
-* **Attacker IP**: `100.116.165.7` (LAN Client)
+* **Attacker IP**: `100.x.x.x` (Tailscale Client)
 * **Timestamp**: Recorded live in forensic audit trail.
 
 ---
@@ -305,13 +305,13 @@ flowchart LR
 2. **Anti-Bot & Client Fingerprinting**:
    SafeLine validates client request behavior. Known scanner signatures (such as default sqlmap headers) are instantly flagged, while requests lacking browser-typical asset retrieval behaviors face progressive challenges.
 3. **Traffic Throttling & Rate Anomaly Mitigation**:
-   Measures request arrival velocity from the source IP (`100.116.165.7` / `192.168.1.12`). Once traffic exceeds safe request-per-second thresholds, SafeLine engages immediate rate-limiting drops, shielding upstream web and database servers from resource exhaustion.
+   Measures request arrival velocity from the source IP (`100.x.x.x` / `192.168.1.12`). Once traffic exceeds safe request-per-second thresholds, SafeLine engages immediate rate-limiting drops, shielding upstream web and database servers from resource exhaustion.
 
 #### Lab Execution Command:
 
 ```bash
 # Automated targeted scan against DVWA Medium SQLi endpoint
-sqlmap -u "http://100.87.215.88/vulnerabilities/sqli/" \
+sqlmap -u "http://100.x.x.x/vulnerabilities/sqli/" \
        --data="id=1&Submit=Submit" \
        --cookie="PHPSESSID=YOUR_SESSION_COOKIE; security=medium" \
        --batch --banner

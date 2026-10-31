@@ -16,7 +16,7 @@ This repository documents hands-on security research covering OWASP Web vulnerab
 
 | Day | Core Subject | Security Level | Status | Writeup |
 | :--- | :--- | :---: | :---: | :--- |
-| **Day 1** | **Reflected XSS, Context Escaping & Filter Evasion** | Low | In Progress | *Pending Writeup* |
+| **Day 1** | **Reflected XSS, Context Escaping & Filter Evasion** | Low & Medium | Complete | [Read Report](docs/xss/day-01-reflected-xss.md) |
 
 ## Research Methodology: Hands-On & AI-Augmented
 
