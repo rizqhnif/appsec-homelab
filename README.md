@@ -18,6 +18,7 @@ This repository documents hands-on security research covering OWASP Web vulnerab
 | :--- | :--- | :---: | :---: | :--- |
 | **Day 1** | **Reflected XSS, Context Escaping & Filter Evasion** | Low & Medium | Complete | [Read Report](docs/xss/day-01-reflected-xss.md) |
 | **Day 2** | **Stored XSS, Session Hijacking & Cookie Defense-in-Depth** | Low & Medium | Complete | [Read Report](docs/xss/day-02-stored-xss.md) |
+| **Day 3** | **DOM-based XSS, Sources/Sinks & URI Fragment WAF Blind Spot** | Low & Medium | Complete | [Read Report](docs/xss/day-03-dom-xss.md) |
 
 ## Research Methodology: Hands-On & AI-Augmented
 
